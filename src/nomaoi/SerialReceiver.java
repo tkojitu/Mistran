@@ -1,18 +1,15 @@
 package nomaoi;
 
 import gnu.io.*;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
+import java.io.*;
 import java.util.Enumeration;
 import java.util.TooManyListenersException;
+import javax.sound.midi.InvalidMidiDataException;
 import javax.sound.midi.MidiMessage;
 import javax.sound.midi.Receiver;
 import javax.sound.midi.ShortMessage;
 
-public class SerialReceiver implements AutoCloseable, Receiver, Runnable,
-        SerialPortEventListener {
+public class SerialReceiver implements AutoCloseable, Receiver, Runnable {
     private static final int TIME_OUT = 2000;
     private static final int DATA_RATE = 57600;
     private static final String PORT_NAMES[] = {
@@ -23,9 +20,8 @@ public class SerialReceiver implements AutoCloseable, Receiver, Runnable,
 
     private SerialPort serialPort;
     private OutputStream output;
-    private BufferedReader reader;
 
-    public boolean setup() {
+    public boolean setup(SerialListener listener) {
         CommPortIdentifier portId = findPortId();
         if (portId == null) {
             System.err.println("Could not find COM port.");
@@ -37,10 +33,12 @@ public class SerialReceiver implements AutoCloseable, Receiver, Runnable,
                                            SerialPort.DATABITS_8,
                                            SerialPort.STOPBITS_1,
                                            SerialPort.PARITY_NONE);
-            serialPort.addEventListener(this);
+            if (listener != null) {
+                listener.setInput(serialPort.getInputStream());
+                serialPort.addEventListener(listener);
+            }
             serialPort.notifyOnDataAvailable(true);
             output = serialPort.getOutputStream();
-            setupReader();
             return true;
         } catch (TooManyListenersException ex) {
             ex.printStackTrace(System.err);
@@ -68,9 +66,8 @@ public class SerialReceiver implements AutoCloseable, Receiver, Runnable,
         return portId;
     }
 
-    private void setupReader() throws IOException {
-        InputStreamReader is = new InputStreamReader(serialPort.getInputStream());
-        reader = new BufferedReader(is);
+    public InputStream getInputStream() throws IOException {
+        return serialPort.getInputStream();
     }
 
     @Override
@@ -98,15 +95,12 @@ public class SerialReceiver implements AutoCloseable, Receiver, Runnable,
         }
     }
 
-    @Override
-    public void serialEvent(SerialPortEvent event) {
-        if (event.getEventType() != SerialPortEvent.DATA_AVAILABLE) {
-            return;
-        }
+    public void setInstrument(int instrument) {
         try {
-            String line = reader.readLine();
-            System.out.println(line);
-        } catch (IOException ex) {
+            ShortMessage message = new ShortMessage();
+            message.setMessage(ShortMessage.PROGRAM_CHANGE, 0, instrument, 0);
+            send(message, -1);
+        } catch (InvalidMidiDataException ex) {
             ex.printStackTrace(System.err);
         }
     }

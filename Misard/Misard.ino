@@ -67,7 +67,7 @@ private:
     bool demo;
 
 public:
-    Misard() : misPort(NULL), index(0), demo(false) {
+    Misard() : misPort(NULL), index(0), demo(true) {
         misPort = new MisPort();
     }
 
@@ -77,12 +77,30 @@ public:
 
     void setup() {
         setupSerial();
-        misPort->setup();
+        setupMisPort();
+        echoHelo();
     }
 
     void setupSerial() {
         Serial.begin(57600);
         Serial.setTimeout(1000);
+    }
+
+    void setupMisPort() {
+        misPort->setup();
+        misPort->setBankDefault();
+    }
+    
+    void echoHelo() {
+        Serial.print("HELO");
+        Serial.flush();
+    }
+
+    void echoBuffer() {
+        Serial.print(buffer[0], HEX);
+        Serial.print(buffer[1], HEX);
+        Serial.print(buffer[2], HEX);
+        Serial.print(buffer[3], HEX);
     }
 
     void loop() {
@@ -113,19 +131,9 @@ public:
         misPort->sendShort(buffer[0], buffer[1], buffer[2], buffer[3]);
     }
 
-    void echoBuffer() {
-        Serial.print(buffer[0], HEX);
-        Serial.print(" ");
-        Serial.print(buffer[1], HEX);
-        Serial.print(" ");
-        Serial.print(buffer[2], HEX);
-        Serial.print(" ");
-        Serial.println(buffer[3], HEX);
-    }
-
     void demoMainBank() {
         misPort->setBankDefault();
-        for (int instrument = 1; instrument <= 8; instrument++) {
+        for (int instrument = 8; instrument >= 1; --instrument) {
             misPort->send(0xC0, instrument, 0);
             for (byte note = 60; note < 70; note++) {
                 misPort->noteOn(0, note, 60);
